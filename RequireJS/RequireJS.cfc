@@ -26,7 +26,7 @@
 			<cfif (StructKeyExists(URL, "reload") && (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "reloadPassword") || !Len(application.wheels.reloadPassword) || (StructKeyExists(URL, "password") && URL.password IS application.wheels.reloadPassword))) 
 					AND StructKeyExists(URL, "optimizeRequireJS")>
 				
-				<!--- only attempt to rebuild the JS code when the start file is dated before the output file --->
+				<!--- only attempt to rebuild the JS code when there is not a currently-running thread (as determined by the presence of the lock file) --->
 				<cfif not local.hasLock.recordCount>
 
 					<cfset loc.basePath = "javascripts/">
