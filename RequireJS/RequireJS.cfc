@@ -5,7 +5,7 @@
         <cfreturn this>
     </cffunction>
 
-	<cffunction name="requireStyleTags" output="false">
+	<cffunction name="requireStyleTags" output="true">
 		<cfargument name="href" type="Array" required="true">
 		<cfargument name="outputTarget" type="string" required="false" default="#ListFirst(Replace(CGI.script_name, '/', '_', "ALL"), '.')#.css">
 		
@@ -51,19 +51,53 @@
 				<cfif Lcase(ListLast(loc.stylesheetSrc, '.')) IS "less">
 					<!--- less files need to be converted to css first --->	
 	
-					<cfdirectory action="list" directory="#GetDirectoryFromPath(GetBaseTemplatePath())#stylesheets" name="loc.ssMetaData" filter="#REReplaceNoCase(loc.stylesheetSrc, ".less$", "")#.*">
+					<cfdirectory action="list" recurse="true" directory="#GetDirectoryFromPath(GetBaseTemplatePath())#stylesheets" name="loc.ssMetaData" type="file">
 
 					<cfset loc.ssTimes = { 
-						"css" = CreateDate(1900,1,1), 
+						"css" = CreateDate(2100,1,1), 
 						"less" = CreateDate(1900,1,1)
 						}>
 
-					<cfloop query="loc.ssMetaData">
-						<cfset loc.ssTimes[LCase(ListLast(name, '.'))] = dateLastModified>
+					<cfset loc.ssFiles = [loc.stylesheetSrc]>
+
+					<cffile action="read" file="#GetDirectoryFromPath(GetBaseTemplatePath())#stylesheets/#loc.stylesheetSrc#" variable="loc.ssContent">
+					
+					<cfset loc.import = ReFindNoCase("@import\s+(.*?);", loc.ssContent, 0, true)>
+
+					<cfloop condition="#ArrayLen(loc.import.pos)# IS 2">
+						<cfset loc.importFile = ReReplace(mid(loc.ssContent, loc.import.pos[2], loc.import.len[2]), "(^""|')|(""|'$)", "", "ALL")>
+						
+						<cfif Find("/", loc.stylesheetSrc)>
+							<cfset loc.importFile = GetDirectoryFromPath(loc.stylesheetSrc) & loc.importFile>
+						</cfif>
+						
+						<cfset ArrayAppend(loc.ssFiles, loc.importFile)>
+
+						<cfset loc.import = ReFindNoCase("@import\s+(.*?);", loc.ssContent, loc.import.pos[2], true)>
 					</cfloop>
 
-					<!--- if the css is older than the less file, it must be out of date and in need of regeneration --->
-					<cfif DateCompare(loc.ssTimes["css"], loc.ssTimes["less"]) LT 1>
+					<cfloop query="loc.ssMetaData">
+
+						<cfloop array="#loc.ssFiles#" index="loc.thisSS">
+							
+							<cfif Replace(directory & "/" & REReplaceNoCase(name, ".(le|c)ss$", ""), "#GetDirectoryFromPath(GetBaseTemplatePath())#stylesheets/","") IS REReplaceNoCase(loc.thisSS, ".less$", "")>
+							
+								<!--- If any of the less files we are dealing with have a date greater than the oldest css, then we need to regenerate.
+										So, we need to find the most recent date associated with each set of our files. --->
+								<cfif 	(LCase(ListLast(name, '.')) IS "less" AND DateCompare(loc.ssTimes[LCase(ListLast(name, '.'))], dateLastModified) LT 0) OR
+										(LCase(ListLast(name, '.')) IS "css" AND DateCompare(loc.ssTimes[LCase(ListLast(name, '.'))], dateLastModified) GT 0)
+										>
+									
+									<cfset loc.ssTimes[LCase(ListLast(name, '.'))] = dateLastModified>
+
+								</cfif>
+
+							</cfif>
+						</cfloop>
+					</cfloop>
+
+					<!--- if the css is older than the less files, it must be out of date and in need of regeneration --->
+					<cfif DateCompare(loc.ssTimes["css"], loc.ssTimes["less"]) LT 0>
 	
 						<cftry>
 							<!--- this usually doesn't take too long to do, so we'll do it synchronously instead of in a separate thread --->
