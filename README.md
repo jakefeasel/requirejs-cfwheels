@@ -178,5 +178,13 @@ Not surprisingly, I'm also using this tag on SQLFiddle.com to manage my styleshe
 		])#
 	</cfoutput>
 
+
+##License
+
+Copyright Jake Feasel, 2012
+
+Released under the terms of the MIT License.
+
+
  
 -- Jake Feasel, 09/16/2012
